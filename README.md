@@ -38,11 +38,9 @@ the same reliability constraints as the log itself.
 
 ### The data log
 
-To ease maintenance, the log is divided into self-contained sections
-called arenas. Each arena contains a large number of data blocks. Within
-an arena is a section for data bocks that is filled in an append-only
-manner. In Jupiter, data blocks are variable sized, but since blocks are
-immutable they can be densely packed into an arena without
+The data log contains a series of data blocks, that are filled in an
+append-only manner. In Jupiter, data blocks are variable sized, but
+since blocks are immutable they can be densely packed without
 fragmentation.
 
 Each block is prefixed by a header that describes the contents of the
@@ -56,15 +54,33 @@ fixed-sized buckets, each of which is stored as a single disk block.
 Each bucket contains the index map for a small section of the
 fingerprint space.  A hash function is used to map fingerprints to index
 buckets in a roughly uniform manner, and then the bucket is examined
-using binary search. In case there is a buffer overflow in a bucket, a
-new bucket will be allocated and the hash function will change.
+using binary search. In case there is a buffer overflow when adding an
+entry to a bucket, a new bucket will be allocated and the hash function
+will change to reflect this.
 
-There are initially 256 buckets of 8K bytes each (2MB).
+There are initially 256 buckets of 8K bytes each (2MB total).
+
+Each bucket has a small header and some fixed-size entries, which have
+the fingerprint of one block, and the address of that block in the data
+log.
+
+#### Bucket header
+
+- Number of bytes for fingerprint per entry
+- Number of bytes for address per entry
+- Number and list of bits used for addressing this particular bucket
+
+The bucket header contains the number of bytes used for the fingerprint,
+the number of bytes used for the address, and the number and value of
+the initial bytes in the fingerprint which are common to all the entries
+in this bucket.  So, each bucket can contain a different number of
+entries.
 
 Each bucket is divided into fixed-size entries, which have the
-fingerprint of one block (part of its score, 48 bits) and the address
-of that block in the data log (48 bits).  So, each bucket can contain
-up to 682 entries.
+fingerprint of one block (48 bits of its score, starting from the 9th
+bit) and the address of that block in the data log (48 bits).  So, each
+bucket can contain up to 682 entries.  The first 4 bytes in a bucket are
+a magic number, and the last 4 are a 32-bit checksum.
 
 We use part of the score instead of all of it for space constraints.
 Thus, if a fingerprint is present it is still necessary to access the
@@ -72,10 +88,11 @@ data in order to know for sure if a block is present in the archive.
 Additionally, there could be several blocks with the same fingerprint
 stored in the index: we will need to check all of them.
 
-The hash function is a combination of the score of the block and a
-binary tree, stored as a binary heap.  The first bits in the score
-determines the position in the binary tree, and the value of that node,
-if not empty, indicates the bucket where the block should be looked up.
+The hash function to determine what bucket index a given block is a
+combination of the score of that block and a binary tree, stored as a
+binary heap.  The first bits in the score determines the position in the
+binary tree, and the value of that node, if not empty, indicates the
+bucket where the block should be looked up.
 
 As an example, let's suppose we begin with an index with 4 buckets, from
 1 to 4, where the first bits in the score determine the bucket:
