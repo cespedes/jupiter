@@ -58,11 +58,16 @@ using binary search. In case there is a buffer overflow when adding an
 entry to a bucket, a new bucket will be allocated and the hash function
 will change to reflect this.
 
-There are initially 256 buckets of 8K bytes each (2MB total).
-
 Each bucket has a small header and some fixed-size entries, which have
-the fingerprint of one block, and the address of that block in the data
-log.
+part of the fingerprint of one block, and the address of that block in
+the data log.
+
+The fingerprint for a bloc is part of its score, not all of it, for
+space constraints.  Thus, if a fingerprint is present in a bucket it is
+still necessary to access the data in order to know for sure if a block
+is present in the archive.  Additionally, there could be several blocks
+with the same fingerprint stored in the index: we will need to check all
+of them.
 
 #### Bucket header
 
@@ -76,17 +81,12 @@ the initial bytes in the fingerprint which are common to all the entries
 in this bucket.  So, each bucket can contain a different number of
 entries.
 
-Each bucket is divided into fixed-size entries, which have the
-fingerprint of one block (48 bits of its score, starting from the 9th
-bit) and the address of that block in the data log (48 bits).  So, each
-bucket can contain up to 682 entries.  The first 4 bytes in a bucket are
-a magic number, and the last 4 are a 32-bit checksum.
+#### Entries in a bucket
 
-We use part of the score instead of all of it for space constraints.
-Thus, if a fingerprint is present it is still necessary to access the
-data in order to know for sure if a block is present in the archive.
-Additionally, there could be several blocks with the same fingerprint
-stored in the index: we will need to check all of them.
+Each bucket is divided into fixed-size entries, which have part of the
+fingerprint of one block and the address of that block in the data log.
+The number of bytes used for the fingerprint and for the address is
+specified in the bucket header, and can be different among buckets.
 
 The hash function to determine what bucket index a given block is a
 combination of the score of that block and a binary tree, stored as a
@@ -134,6 +134,44 @@ The table index will always reside in memory.  The index buckets will be
 in memory after they are used for the first time.
 
 ### Index initialization
+
+Disk storage
+------------
+
+### Configuration
+
+For a given Jupiter instance, we need to know a few things.
+This configuration is stored as a text file, with one line for each
+configuration option:
+
+* the server listen address
+  listen *address*
+* the HTTP port for stats
+  http *address*
+* location of the binary heap in disk
+  heap *location*
+* size of each bucket in bytes
+  bucketsize *size*
+* number of bytes used for fingerprint in each bucket entry
+  fpsize *size*
+* location of the index buckets in disk
+  buckets *location*
+* location of the data log in disk
+  data *location*
+
+
+### Binary heap
+
+Each entry in the tree has the address of a bucket, expressed as a
+big-endian 32-bit unsigned int.  Thus, the maximum number of buckets
+is 2^32.i, which will give us:
+* 32TB maximum memory for buckets, assuming 8K buckets
+* 2T blocks of data, assuming 16 bytes per entry.
+* 4 PB of storage, assuming 2K bytes per data block.
+
+### Index buckets
+### Data log
+
 
 References
 ----------
