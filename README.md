@@ -5,8 +5,8 @@ found with the same address: the addresses of multiple writes of the
 same data are identical, so duplicate data is easily identified and
 the data block is stored only once.
 
-Jupiter is heavily inspired by Venti, designed and implemented at Bell
-Labs for the Plan 9 distribution.
+Jupiter is heavily inspired by Venti, a network storage system
+designed and implemented at Bell Labs for the Plan 9 distribution.
 
 Details
 -------
@@ -23,8 +23,8 @@ the protocol are listed below:
 + write(data) stores data at the address calculated by its hash (score),
   and returns this score.
 
-Implementation
---------------
+Storage
+-------
 
 The implementation uses an append-only log of data blocks and an index
 that maps fingerprints to locations in this log.
@@ -52,46 +52,40 @@ compressed size and uncompressed size.
 We implement the index using a hash table.  The index is divided into
 fixed-sized buckets, each of which is stored as a single disk block.
 Each bucket contains the index map for a small section of the
-fingerprint space.  A hash function is used to map fingerprints to index
-buckets in a roughly uniform manner, and then the bucket is examined
-using binary search. In case there is a buffer overflow when adding an
-entry to a bucket, a new bucket will be allocated and the hash function
-will change to reflect this.
+score space, as a list of entries sorted by score.  A hash function is
+used to map scores to index buckets in a roughly uniform manner, and
+then the bucket is examined using binary search. In case there is a
+buffer overflow when adding an entry to a bucket, a new bucket will be
+allocated and the hash function will change to reflect this.
 
 Each bucket has a small header and some fixed-size entries, which have
-part of the fingerprint of one block, and the address of that block in
+part of the score of one block, and the address of that block in
 the data log.
 
-The fingerprint for a bloc is part of its score, not all of it, for
-space constraints.  Thus, if a fingerprint is present in a bucket it is
+We store in the index buckets part of the score, not all of it, for
+space constraints.  Thus, if there is a match in a bucket it is
 still necessary to access the data in order to know for sure if a block
-is present in the archive.  Additionally, there could be several blocks
-with the same fingerprint stored in the index: we will need to check all
-of them.
+is present in the archive.  Additionally, the part of the score we store
+could be shared by several blocks in the index, and we will need to check
+all of them to look for a specific block.
 
 #### Bucket header
 
-- Number of bytes for fingerprint per entry
-- Number of bytes for address per entry
-- Number and list of bits used for addressing this particular bucket
+The bucket header contains:
 
-The bucket header contains the number of bytes used for the fingerprint,
-the number of bytes used for the address, and the number and value of
-the initial bytes in the fingerprint which are common to all the entries
-in this bucket.  So, each bucket can contain a different number of
-entries.
+- the number of bytes in the score used to identify each entry
+- the number and value of the initial bits in the score which are
+  common to all the entries in this bucket
+- the number of bytes used to address each entry in the data log
+
+So, each bucket can contain a different number of entries.
 
 #### Entries in a bucket
 
-Each bucket is divided into fixed-size entries, which have part of the
-fingerprint of one block and the address of that block in the data log.
-The number of bytes used for the fingerprint and for the address is
-specified in the bucket header, and can be different among buckets.
-
-The hash function to determine what bucket index a given block is a
-combination of the score of that block and a binary tree, stored as a
-binary heap.  The first bits in the score determines the position in the
-binary tree, and the value of that node, if not empty, indicates the
+The hash function to determine in which bucket can we find a given block
+is a combination of the score of that block and a binary tree, stored as
+a binary heap.  The first bits in the score determines the position in
+the binary tree, and the value of that node, if not empty, indicates the
 bucket where the block should be looked up.
 
 As an example, let's suppose we begin with an index with 4 buckets, from
