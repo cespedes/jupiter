@@ -1,15 +1,62 @@
-package jupiter
+package main
 
 import (
+	"bytes"
 	"crypto/sha512"
 	"fmt"
 	"os"
 )
 
 const (
+	BlockSize        = 8192
+	DirtyBucket      = 1 << 31 // this bucket has not been synced to disk
 	NotLeaf          = ^uint32(0)
 	TableInitialSize = 1 << 8 // should be a power of 2
+	EntriesInBucket  = 682
+	ScoreSize        = 32
 )
+
+type Score [ScoreSize]byte // should have 256 bits (32 bytes)
+
+func (s Score) equal(s2 Score) bool {
+	return bytes.Equal(s[:], s2[:])
+}
+
+func (s Score) String() string {
+	return fmt.Sprintf("%0x", s[:])
+}
+
+var zeroScore = Score{}
+
+//type Bucket [BlockSize]byte
+
+//type Bucket int
+
+type Bucket struct {
+	scores [EntriesInBucket]Score
+}
+
+//type Bucket [EntriesInBucket]Score
+
+func (b Bucket) score(i int) Score {
+	return b.scores[i]
+}
+
+func (b *Bucket) setScore(i int, s Score) {
+	b.scores[i] = s
+}
+
+var buckets []Bucket
+
+func (b Bucket) size() int {
+	var i int
+	for i = 0; i < EntriesInBucket; i++ {
+		if b.score(i).equal(zeroScore) {
+			break
+		}
+	}
+	return i
+}
 
 var table []uint32 // this is a binary heap
 
@@ -61,7 +108,7 @@ func insertScore(s Score) {
 	t, b := getBucket(s)
 	fmt.Printf("score=%v, table=%d, bucket=%d\n", s, t, b)
 	for i := 0; i < EntriesInBucket; i++ {
-		if buckets[b].score(i).Equal(ZeroScore) {
+		if buckets[b].score(i).equal(zeroScore) {
 			buckets[b].setScore(i, s)
 			return
 		}
@@ -76,7 +123,7 @@ func insertScore(s Score) {
 	table[t] = NotLeaf
 	var bb Bucket = buckets[b]
 	for i := 0; i < EntriesInBucket; i++ {
-		buckets[b].setScore(i, ZeroScore)
+		buckets[b].setScore(i, zeroScore)
 	}
 	for i := 0; i < EntriesInBucket; i++ {
 		insertScore(bb.score(i))
