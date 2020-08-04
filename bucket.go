@@ -1,9 +1,9 @@
 package jupiter
 
 const (
-	BlockSize        = 8192
-	DirtyBucket      = 1 << 31 // this bucket has not been synced to disk
-	EntriesInBucket  = 682
+	BlockSize       = 8192
+	DirtyBucket     = 1 << 31 // this bucket has not been synced to disk
+	EntriesInBucket = 682
 )
 
 //type Bucket [BlockSize]byte
@@ -11,17 +11,24 @@ const (
 //type Bucket int
 
 type Bucket struct {
-	scores [EntriesInBucket]Score
+	entries [EntriesInBucket]Entry
 }
 
 //type Bucket [EntriesInBucket]Score
 
-func (b Bucket) score(i int) Score {
-	return b.scores[i]
+// GetAddress returns the possible addresses for a given Score, if found in the bucket
+func (b Bucket) GetAddress(s Score) []uint64 {
+	return nil
 }
 
-func (b *Bucket) setScore(i int, s Score) {
-	b.scores[i] = s
+// Add adds an entry in a bucket, identified by a score, and points it to a given address.
+// It returns true if successful, false if there is no space in the bucket.
+func (b Bucket) Add(s Score, a uint64) bool {
+	return false
+}
+
+func (b Bucket) score(i int) Score {
+	return b.entries[i].s
 }
 
 func (b Bucket) size() int {
@@ -35,4 +42,3 @@ func (b Bucket) size() int {
 }
 
 var buckets []Bucket
-

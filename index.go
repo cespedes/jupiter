@@ -2,13 +2,16 @@ package jupiter
 
 type Index struct {
 	filename string
-	DataLog  *DataLog
 }
 
 func OpenIndex(filename string) *Index {
-	return nil
+	return &Index{filename: filename}
 }
 
 func (i *Index) GetEntry(score Score) *Entry {
 	return nil
+}
+
+func (i *Index) GetBucketFromScore(score Score) int {
+	return 0
 }

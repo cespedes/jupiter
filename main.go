@@ -46,7 +46,7 @@ func init() {
 func getBucket(s Score) (tableno int, bucket uint32) {
 	i := 0
 	for b := 0; ; b++ {
-		if !bit(s[:], b) {
+		if !bit(s.s[:], b) {
 			i = i*2 + 1
 		} else {
 			i = i*2 + 2
@@ -60,14 +60,12 @@ func getBucket(s Score) (tableno int, bucket uint32) {
 func insertScore(s Score) {
 	t, b := getBucket(s)
 	fmt.Printf("score=%v, table=%d, bucket=%d\n", s, t, b)
-	for i := 0; i < EntriesInBucket; i++ {
-		if buckets[b].score(i).Equal(ZeroScore) {
-			buckets[b].setScore(i, s)
-			return
-		}
+	if buckets[b].Add(s, 42) == true {
+		return
 	}
 	buckets = append(buckets, Bucket{})
 	fmt.Printf("No more room in bucket %d; created new bucket %d and moving scores...\n", b, len(buckets)-1)
+
 	if len(table) <= 2*t+2 {
 		table = append(table, make([]uint32, 2*t+2-len(table)+1)...)
 	}
@@ -108,7 +106,7 @@ func main() {
 		h := sha512.New512_256()
 		h.Write([]byte(os.Args[i]))
 		var s Score
-		copy(s[:], h.Sum(nil))
+		copy(s.s[:], h.Sum(nil))
 		insertScore(s)
 	}
 	min := EntriesInBucket
