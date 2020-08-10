@@ -1,44 +1,152 @@
 package jupiter
 
+import (
+	"encoding/binary"
+)
+
 const (
 	BlockSize       = 8192
 	DirtyBucket     = 1 << 31 // this bucket has not been synced to disk
-	EntriesInBucket = 682
 )
 
-//type Bucket [BlockSize]byte
+//type Bucket struct {
+//	scoreBytes      int
+//	addressBytes    int
+//	scoreCommonBits int
+//	commonScore     []byte
+//	entries [EntriesInBucket]Entry
+//}
 
-//type Bucket int
+// A Bucket is a byte array of a given size with a header and a list of entries.
 
-type Bucket struct {
-	entries [EntriesInBucket]Entry
+type Bucket [BlockSize]byte
+
+// Contents of the header:
+// * The first 4 bytes will be "Jbkt" (magic number)
+// * The next 2 bytes will have the number of used entries in this bucket
+// * The next byte will have the number of bytes used to address
+//   each entry in the data log (addressBytes)
+// * The next byte will have the number of bytes for the score used    <--- is this really needed?
+//   to identify each entry (scoreBytes)
+// * The next byte will have the number of bits of the score which are
+//   common to all the entries in this bucket (scoreCommonBits)
+// * The next ((scoreCommonBits+7)/8) bytes will have the value of these bits
+// * The rest of the array will have entries of size
+//   (addressBytes + scoreBytes - scoreCommonBits/8)
+// Each entry has 2 parts:
+// * (scoreBytes - scoreCommonBits/8) bytes will be part of the score (right-aligned)
+// * (addressBytes) bytes will be the address of the block in the data log
+
+const (
+	bktNumEntries         = 4
+	bktNumAddressBytes    = 6
+	bktNumScoreBytes      = 7
+	bktNumScoreCommonBits = 8
+)
+
+// Examples (blockSize=8192)
+// -------------------------
+// addressBytes scoreBytes scoreCommonBits header-size entry-size max-entries
+// ------------ ---------- --------------- ----------- ---------- -----------
+//           2          4               5          10          6        1363
+//           6         10              10          11         15         545
+// value of the initial bits in the score
+// - the number of bytes in the score used to identify each entry
+// - the number and value of the initial bits in the score which are
+//   common to all the entries in this bucket
+
+func newBucket(scoreBytes int) *Bucket {
+	b := new(Bucket)
+	b[0] = 'J'
+	b[1] = 'b'
+	b[2] = 'k'
+	b[3] = 't'
+	b[bktNumAddressBytes] = 0
+	b[bktNumScoreBytes] = byte(scoreBytes)
+	b[bktNumScoreCommonBits] = 0
+	return b
 }
 
-//type Bucket [EntriesInBucket]Score
+func (b *Bucket) numAddressBytes() int {
+	return int(b[bktNumAddressBytes])
+}
+
+func (b *Bucket) numScoreBytes() int {
+	return int(b[bktNumScoreBytes])
+}
+
+func (b *Bucket) numScoreCommonBits() int {
+	return int(b[bktNumScoreCommonBits])
+}
+
+func (b *Bucket) entrySize() int {
+	return b.numAddressBytes() + b.numScoreBytes() - b.numScoreCommonBits()/8
+}
+
+func (b *Bucket) entryOffset() int {
+	return bktNumScoreCommonBits + 1 + (b.numScoreCommonBits()+7)/8
+}
+
+func (b *Bucket) NumEntries() int {
+	r := binary.BigEndian.Uint16(b[bktNumEntries:bktNumEntries+2])
+	return int(r)
+}
+
+type Entry struct {
+	score Score
+	mask  int
+	addr  uint64
+}
+
+func (b *Bucket) GetEntry(i int) *Entry {
+	var e Entry
+	scoreBytes := b.numScoreBytes()
+	commonBits := b.numScoreCommonBits()
+	commonBytes := (commonBits+7)/8
+	entryBytes := scoreBytes - commonBits/8
+	copy(e.score.s[:commonBytes], b[bktNumScoreCommonBits+1:])
+
+	offset := b.entryOffset() + i * b.entrySize()
+	copy(e.score.s[scoreBytes-entryBytes:scoreBytes+1], b[offset:])
+
+	e.mask = scoreBytes * 8
+
+	addrBytes := b.numAddressBytes()
+	j := offset + entryBytes
+	for i:=0; i<addrBytes; i++ {
+		e.addr *= 256
+		e.addr += uint64(b[j])
+		j++
+	}
+	return &e
+}
 
 // GetAddress returns the possible addresses for a given Score, if found in the bucket
-func (b Bucket) GetAddress(s Score) []uint64 {
-	return nil
+func (b *Bucket) GetAddress(s Score) []uint64 {
+	var result []uint64
+	for i:=0; i<b.NumEntries(); i++ {
+		e := b.GetEntry(i)
+		if s.Match(e.score, e.mask) {
+			result = append(result, e.addr)
+		}
+	}
+	return result
 }
 
 // Add adds an entry in a bucket, identified by a score, and points it to a given address.
 // It returns true if successful, false if there is no space in the bucket.
-func (b Bucket) Add(s Score, a uint64) bool {
+func (b *Bucket) Add(s Score, a uint64) bool {
+	// TODO: check if "s" fits in "numScoreCommonBits" (panic if not).
+	// TODO: check if "a" fits in "numAddressBytes".  If not, try to increment
+	//       "numAddressBytes", and return false if there no space to do it.
+	// TODO: check if (s, a) is already in the bucket (return true if so).
+	// TODO: check if there is enough space (return false if not).
+	panic("not implemented")
 	return false
 }
 
-func (b Bucket) score(i int) Score {
-	return b.entries[i].s
+// Split divides the entries in a bucket into two, in order to add a new bucket to an index.
+func (b *Bucket) Split(b2 *Bucket) error {
+	panic("not implemented")
+	return nil
 }
-
-func (b Bucket) size() int {
-	var i int
-	for i = 0; i < EntriesInBucket; i++ {
-		if b.score(i).Equal(ZeroScore) {
-			break
-		}
-	}
-	return i
-}
-
-var buckets []Bucket

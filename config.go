@@ -1,12 +1,12 @@
 package jupiter
 
-type config struct {
-	listenPort   int
-	httPport     int
-	indexFiles   []string
-	datalogFiles []string
+type Config struct {
+	ListenPort   int
+	HTTPPort     int
+	IndexFiles   []string
+	DataLogFiles []string
 }
 
-func readConfig(c string) *config {
+func readConfig(f string) *Config {
 	return nil
 }

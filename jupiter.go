@@ -1,17 +1,22 @@
 package jupiter
 
 type Jupiter struct {
-	index *Index
+	config   *Config
+	binheap  *BinHeap
+	indexes  []*Index
+	datalogs []*DataLog
 }
 
-func Open(config string) *Jupiter {
+type Type byte
+
+func Open(c *Config) *Jupiter {
 	return nil
 }
 
-func (j *Jupiter) Read(s Score) []byte {
-	return nil
+func (j *Jupiter) Read(s Score) (Type, []byte) {
+	return 0, nil
 }
 
-func (j *Jupiter) Write(b []byte) Score {
+func (j *Jupiter) Write(t Type, b []byte) Score {
 	return ZeroScore
 }
