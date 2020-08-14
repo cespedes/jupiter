@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	BlockSize       = 8192
-	DirtyBucket     = 1 << 31 // this bucket has not been synced to disk
+	BlockSize   = 8192
+	DirtyBucket = 1 << 31 // this bucket has not been synced to disk
 )
 
 //type Bucket struct {
@@ -42,6 +42,7 @@ const (
 	bktNumAddressBytes    = 6
 	bktNumScoreBytes      = 7
 	bktNumScoreCommonBits = 8
+	bktScoreCommonOffset  = 9
 )
 
 // Examples (blockSize=8192)
@@ -55,15 +56,18 @@ const (
 // - the number and value of the initial bits in the score which are
 //   common to all the entries in this bucket
 
-func newBucket(scoreBytes int) *Bucket {
+func newBucket(numScoreBytes int, numScoreCommonBits int, scoreCommonBytes []byte) *Bucket {
 	b := new(Bucket)
 	b[0] = 'J'
 	b[1] = 'b'
 	b[2] = 'k'
 	b[3] = 't'
 	b[bktNumAddressBytes] = 0
-	b[bktNumScoreBytes] = byte(scoreBytes)
-	b[bktNumScoreCommonBits] = 0
+	b[bktNumScoreBytes] = byte(numScoreBytes)
+	b[bktNumScoreCommonBits] = byte(numScoreCommonBits)
+	for i := 0; i < (numScoreCommonBits+7)/8; i++ {
+		b[bktScoreCommonOffset+i] = scoreCommonBytes[i]
+	}
 	return b
 }
 
@@ -79,6 +83,14 @@ func (b *Bucket) numScoreCommonBits() int {
 	return int(b[bktNumScoreCommonBits])
 }
 
+func (b *Bucket) CommonScore() (score Score, mask int) {
+	mask := b.numScoreCommonBits()
+	commonBytes := (mask + 7) / 8
+	copy(score.s[:commonBytes], b[bktScoreCommonOffset:])
+
+	return score, mask
+}
+
 func (b *Bucket) entrySize() int {
 	return b.numAddressBytes() + b.numScoreBytes() - b.numScoreCommonBits()/8
 }
@@ -88,7 +100,7 @@ func (b *Bucket) entryOffset() int {
 }
 
 func (b *Bucket) NumEntries() int {
-	r := binary.BigEndian.Uint16(b[bktNumEntries:bktNumEntries+2])
+	r := binary.BigEndian.Uint16(b[bktNumEntries : bktNumEntries+2])
 	return int(r)
 }
 
@@ -102,18 +114,18 @@ func (b *Bucket) GetEntry(i int) *Entry {
 	var e Entry
 	scoreBytes := b.numScoreBytes()
 	commonBits := b.numScoreCommonBits()
-	commonBytes := (commonBits+7)/8
-	entryBytes := scoreBytes - commonBits/8
-	copy(e.score.s[:commonBytes], b[bktNumScoreCommonBits+1:])
+	commonBytes := (commonBits + 7) / 8
+	copy(e.score.s[:commonBytes], b[bktScoreCommonOffset:])
 
-	offset := b.entryOffset() + i * b.entrySize()
+	entryBytes := scoreBytes - commonBits/8
+	offset := b.entryOffset() + i*b.entrySize()
 	copy(e.score.s[scoreBytes-entryBytes:scoreBytes+1], b[offset:])
 
 	e.mask = scoreBytes * 8
 
 	addrBytes := b.numAddressBytes()
 	j := offset + entryBytes
-	for i:=0; i<addrBytes; i++ {
+	for i := 0; i < addrBytes; i++ {
 		e.addr *= 256
 		e.addr += uint64(b[j])
 		j++
@@ -124,7 +136,7 @@ func (b *Bucket) GetEntry(i int) *Entry {
 // GetAddress returns the possible addresses for a given Score, if found in the bucket
 func (b *Bucket) GetAddress(s Score) []uint64 {
 	var result []uint64
-	for i:=0; i<b.NumEntries(); i++ {
+	for i := 0; i < b.NumEntries(); i++ {
 		e := b.GetEntry(i)
 		if s.Match(e.score, e.mask) {
 			result = append(result, e.addr)
@@ -133,14 +145,28 @@ func (b *Bucket) GetAddress(s Score) []uint64 {
 	return result
 }
 
-// Add adds an entry in a bucket, identified by a score, and points it to a given address.
+// Add adds an entry to a bucket, identified by a score, and points it to a given address.
 // It returns true if successful, false if there is no space in the bucket.
 func (b *Bucket) Add(s Score, a uint64) bool {
-	// TODO: check if "s" fits in "numScoreCommonBits" (panic if not).
-	// TODO: check if "a" fits in "numAddressBytes".  If not, try to increment
-	//       "numAddressBytes", and return false if there no space to do it.
-	// TODO: check if (s, a) is already in the bucket (return true if so).
-	// TODO: check if there is enough space (return false if not).
+	commonScore, mask = b.CommonScore()
+	if !s.Match(commonScore, mask) {
+		panic(fmt.Sprintf("Bucket.Add: score %s outsoide of %s/%d", s, commonScore, mask))
+	}
+	// TODO:
+	//	if "a" fits in "numAddressBytes" {
+	//		if (s, a) is already in the bucket {
+	//			return true
+	//		}
+	//	} else {
+	//		if there is not enough space to increment "numAddressBytes" *and* add the new score {
+	//			return false
+	//		}
+	//		increment "numAddressBytes"
+	//	}
+	//	if there is not enough space to add the new score {
+	//		return false
+	//	}
+	//	add new score
 	panic("not implemented")
 	return false
 }
