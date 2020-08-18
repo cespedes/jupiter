@@ -4,10 +4,16 @@ import (
 	"testing"
 )
 
+type newbucketer struct{}
+
+func (_ newbucketer) NewBucket(numScoreCommonBits int, scoreCommonBytes []byte) (uint32, error) {
+	return 0, nil
+}
+
 func TestBinHeap(t *testing.T) {
-	bh := NewBinHeap("foo", 0)
-	if bh == nil {
-		t.Errorf("NewBinHeap() returned nil")
+	bh, err := NewBinHeap(newbucketer{})
+	if bh == nil || err != nil{
+		t.Errorf("error calling NewBinHeap()")
 	}
 	s1 := ZeroScore
 	s2 := GetScore([]byte{})
@@ -15,7 +21,7 @@ func TestBinHeap(t *testing.T) {
 	t.Logf("GetBucket(s1) = (%d,%d)", k, v)
 	k, v = bh.GetBucket(s2)
 	t.Logf("GetBucket(s2) = (%d,%d)", k, v)
-	err := bh.NewLeaf(0, 1)
+	err = bh.NewLeaf(0, 1)
 	if err != nil {
 		t.Errorf("NewLeaf(0,1): %v", err)
 	}

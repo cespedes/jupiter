@@ -1,6 +1,7 @@
 package jupiter
 
 import (
+	"fmt"
 	"encoding/binary"
 )
 
@@ -71,6 +72,20 @@ func newBucket(numScoreBytes int, numScoreCommonBits int, scoreCommonBytes []byt
 	return b
 }
 
+// Init prepares a Bucket for its use.  A Bucket cannot be used until it has been Init'd
+func (b *Bucket) Init(numScoreBytes int, numScoreCommonBits int, scoreCommonBytes []byte) {
+	b[0] = 'J'
+	b[1] = 'b'
+	b[2] = 'k'
+	b[3] = 't'
+	b[bktNumAddressBytes] = 0
+	b[bktNumScoreBytes] = byte(numScoreBytes)
+	b[bktNumScoreCommonBits] = byte(numScoreCommonBits)
+	for i := 0; i < (numScoreCommonBits+7)/8; i++ {
+		b[bktScoreCommonOffset+i] = scoreCommonBytes[i]
+	}
+}
+
 func (b *Bucket) numAddressBytes() int {
 	return int(b[bktNumAddressBytes])
 }
@@ -84,7 +99,7 @@ func (b *Bucket) numScoreCommonBits() int {
 }
 
 func (b *Bucket) CommonScore() (score Score, mask int) {
-	mask := b.numScoreCommonBits()
+	mask = b.numScoreCommonBits()
 	commonBytes := (mask + 7) / 8
 	copy(score.s[:commonBytes], b[bktScoreCommonOffset:])
 
@@ -145,24 +160,40 @@ func (b *Bucket) GetAddress(s Score) []uint64 {
 	return result
 }
 
+func numBytesInUint64(a uint64) int {
+	if a==0 {
+		return 0
+	} else {
+		return 1 + numBytesInUint64(a >> 8)
+	}
+}
+
 // Add adds an entry to a bucket, identified by a score, and points it to a given address.
 // It returns true if successful, false if there is no space in the bucket.
 func (b *Bucket) Add(s Score, a uint64) bool {
-	commonScore, mask = b.CommonScore()
+	commonScore, mask := b.CommonScore()
 	if !s.Match(commonScore, mask) {
-		panic(fmt.Sprintf("Bucket.Add: score %s outsoide of %s/%d", s, commonScore, mask))
+		panic(fmt.Sprintf("Bucket.Add: score %s outside of %s/%d", s, commonScore, mask))
+	}
+
+	// Does "a" fit in "numAddressBytes"?
+	if numBytesInUint64(a) <= b.numAddressBytes() {
+		// Is this entry already added?
+		for i := 0; i < b.NumEntries(); i++ {
+			e := b.GetEntry(i)
+			if s.Match(e.score, e.mask) && a == e.addr {
+				return true
+			}
+		}
+	} else {
+		newEntrySize := numBytesInUint64(a) + b.numScoreBytes() - b.numScoreCommonBits()/8
+		if (b.NumEntries() + 1) * newEntrySize > BlockSize - b.entryOffset() {
+			return false
+		}
+		// TODO: increment "numAddressBytes"
+		panic("not implemented")
 	}
 	// TODO:
-	//	if "a" fits in "numAddressBytes" {
-	//		if (s, a) is already in the bucket {
-	//			return true
-	//		}
-	//	} else {
-	//		if there is not enough space to increment "numAddressBytes" *and* add the new score {
-	//			return false
-	//		}
-	//		increment "numAddressBytes"
-	//	}
 	//	if there is not enough space to add the new score {
 	//		return false
 	//	}

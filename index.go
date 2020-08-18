@@ -10,6 +10,8 @@ import (
 type Index struct {
 	filename          string
 	scoreBytesInEntry int
+	// A "firstBucket" could be used to support several indexes
+	// TODO firstBucket       uint32
 	numBuckets        uint32
 	maxBuckets        uint32 // 0 if there is no limit
 	buckets           map[uint32]*Bucket
@@ -22,8 +24,11 @@ func OpenIndex(filename string) *Index {
 }
 
 // NexIndex creates a new index from scratch
-func NewIndex(filename string, scoreBytesInEntry int) *Index {
-	return &Index{filename: filename, scoreBytesInEntry: scoreBytesInEntry}
+//func NewIndex(scoreBytesInEntry int, firstBucket uint32) *Index {
+//	return &Index{scoreBytesInEntry: scoreBytesInEntry, firstBucket: firstBucket}
+//}
+func NewIndex(scoreBytesInEntry int) *Index {
+	return &Index{scoreBytesInEntry: scoreBytesInEntry}
 }
 
 // NumBuckets returns the number of buckets in an Index

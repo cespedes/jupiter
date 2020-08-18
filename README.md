@@ -44,8 +44,8 @@ since blocks are immutable they can be densely packed without
 fragmentation.
 
 Each block is prefixed by a header that describes the contents of the
-block.  The header contains the score, the compression type, the
-compressed size and uncompressed size.
+block.  The header contains the score, the type, the compression
+algorithm, the compressed size and uncompressed size.
 
 ### The index
 

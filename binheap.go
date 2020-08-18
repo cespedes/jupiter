@@ -10,8 +10,17 @@ const (
 )
 
 type BinHeap struct {
-	filename string
-	table []uint32
+	filename    string
+	table       []uint32
+	newBucketer NewBucketer
+}
+
+type NewBucketer interface {
+	NewBucket(numScoreCommonBits int, scoreCommonBytes []byte) (uint32, error)
+}
+
+type Bucketer interface {
+	Bucket(n uint32) *Bucket
 }
 
 // OpenBinHeap opens a BinHeap stored in disk
@@ -21,8 +30,14 @@ func OpenBinHeap(filename string) *BinHeap {
 }
 
 // NewBinHeap creates a new binary heap, to be used as a hash function combined with an Index
-func NewBinHeap(filename string, firstBucket uint32) *BinHeap {
-	return &BinHeap{filename: filename, table: []uint32{firstBucket}}
+func NewBinHeap(f NewBucketer) (*BinHeap, error) {
+	firstBucket, err := f.NewBucket(0, []byte{})
+	if err != nil {
+		return nil, err
+	}
+	bh := new(BinHeap)
+	bh.table = []uint32{firstBucket}
+	return &BinHeap{table: []uint32{firstBucket}}, nil
 }
 
 func isBitSet(b []byte, n int) bool {
@@ -100,5 +115,30 @@ func (bh *BinHeap) NewLeaf(k int, v uint32) error {
 	bh.table[2*k+1] = bh.table[k]
 	bh.table[2*k+2] = v
 	bh.table[k] = BHNotLeaf
+	return nil
+}
+
+// Split replaces one leaf with two leaves
+func (bh *BinHeap) Split(k int, f interface{NewBucketer; Bucketer}) error {
+	if k < 0 || k >= len(bh.table) {
+		return fmt.Errorf("BinHeap.Set: invalid argument for key")
+	}
+	if bh.table[k] == BHNotLeaf {
+		return fmt.Errorf("BinHeap.Set: key=%d: invalid argument (this is not a leaf)", k)
+	}
+	if len(bh.table) <= 2*k+2 {
+		bh.table = append(bh.table, make([]uint32, 2*k+3-len(bh.table))...)
+	}
+	// numScoreCommonBits := 
+	// scoreCommonBits := 
+	// nextBucket, err := f.NewBucket(numScoreCommonBits, scoreCommonBytes)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	bh.table[2*k+1] = bh.table[k]
+	// bh.table[2*k+2] = nextBucket
+	bh.table[k] = BHNotLeaf
+	b1 := f.Bucket(k)
+	b2 := f.Bucket(nextBucket)
 	return nil
 }
