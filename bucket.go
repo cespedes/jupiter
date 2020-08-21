@@ -1,8 +1,8 @@
 package jupiter
 
 import (
-	"fmt"
 	"encoding/binary"
+	"fmt"
 )
 
 const (
@@ -63,7 +63,7 @@ func newBucket(numScoreBytes int, numScoreCommonBits int, scoreCommonBytes []byt
 	b[1] = 'b'
 	b[2] = 'k'
 	b[3] = 't'
-	b[bktNumAddressBytes] = 0
+	b[bktNumAddressBytes] = 1
 	b[bktNumScoreBytes] = byte(numScoreBytes)
 	b[bktNumScoreCommonBits] = byte(numScoreCommonBits)
 	for i := 0; i < (numScoreCommonBits+7)/8; i++ {
@@ -161,10 +161,10 @@ func (b *Bucket) GetAddress(s Score) []uint64 {
 }
 
 func numBytesInUint64(a uint64) int {
-	if a==0 {
+	if a == 0 {
 		return 0
 	} else {
-		return 1 + numBytesInUint64(a >> 8)
+		return 1 + numBytesInUint64(a>>8)
 	}
 }
 
@@ -177,10 +177,12 @@ func (b *Bucket) Add(s Score, a uint64) bool {
 		panic(fmt.Sprintf("Bucket.Add(): score %s outside of %s/%d", s, commonScore, mask))
 	}
 
+	numEntries := b.NumEntries()
+
 	// Does "a" fit in "numAddressBytes"?
 	if numBytesInUint64(a) <= b.numAddressBytes() {
 		// Is this entry already added?
-		for i := 0; i < b.NumEntries(); i++ {
+		for i := 0; i < numEntries; i++ {
 			e := b.GetEntry(i)
 			if s.Match(e.score, e.mask) && a == e.addr {
 				return true
@@ -188,24 +190,37 @@ func (b *Bucket) Add(s Score, a uint64) bool {
 		}
 	} else {
 		newEntrySize := numBytesInUint64(a) + b.numScoreBytes() - b.numScoreCommonBits()/8
-		if (b.NumEntries() + 1) * newEntrySize > BlockSize - b.entryOffset() {
+		if (numEntries+1)*newEntrySize > BlockSize-b.entryOffset() {
 			return false
 		}
 		// TODO: increment "numAddressBytes"
+		fmt.Printf("numAddressBytes=%d, a=%d\n", b.numAddressBytes(), a)
 		panic("Bucket.Add(): incrementing numAddressBytes: not implemented")
 	}
-	entrySize := b.numAddressBytes() + b.numScoreBytes() - b.numScoreCommonBits()/8
+	addressBytes := b.numAddressBytes()
+	scoreBytes := b.numScoreBytes()
+	commonBits := b.numScoreCommonBits()
+	scoreEntryBytes := scoreBytes - commonBits/8
+
+	entrySize := addressBytes + scoreEntryBytes
 	maxEntries := (BlockSize - b.entryOffset()) / entrySize
-	if maxEntries <= b.NumEntries() {
+	if maxEntries <= numEntries {
 		// not enough space to add the new score
 		return false
 	}
-	offset := b.entryOffset() + b.NumEntries()*entrySize
-	// TODO: add score to entry
-	// TODO: add addr to entry
-	// TODO: increment NumEntries
-	panic("Bucket.Add(): adding new score: not implemented")
-	return false
+	offset := b.entryOffset() + numEntries*entrySize
+
+	// Add score to entry:
+	copy(b[offset:offset+scoreEntryBytes], s.s[scoreBytes-scoreEntryBytes:])
+
+	// Add addr to entry:
+	a2 := make([]byte, 8)
+	binary.BigEndian.PutUint64(a2, a)
+	copy(b[offset+scoreEntryBytes:], a2[8-addressBytes:])
+
+	// Increment NumEntries:
+	binary.BigEndian.PutUint16(b[bktNumEntries:bktNumEntries+2], uint16(numEntries+1))
+	return true
 }
 
 // Split divides the entries in a bucket into two, in order to add a new bucket to an index.

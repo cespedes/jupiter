@@ -7,8 +7,8 @@ import (
 const ScoreBytesInEntry = 10
 
 type Jupiter struct {
-	config   *Config
-	binheap  *BinHeap
+	config  *Config
+	binheap *BinHeap
 	// indexes  []*Index   // Just one index and one datalog for now
 	// datalogs []*DataLog
 	index   *Index
@@ -41,6 +41,7 @@ func New() (*Jupiter, error) {
 func (j *Jupiter) Read(score Score) (Type, []byte, error) {
 	_, buckn := j.binheap.GetBucket(score)
 	bucket := j.index.Bucket(buckn)
+	// fmt.Printf("DEBUG: Jupiter.Read: bucket=%v\n", bucket)
 	addrs := bucket.GetAddress(score)
 	for _, addr := range addrs {
 		t, b, err := j.datalog.ReadChunk(score, addr)
@@ -58,7 +59,7 @@ func (j *Jupiter) Write(t Type, b []byte) (Score, error) {
 	addrs := bucket.GetAddress(score)
 	for _, addr := range addrs {
 		tt, err := j.datalog.PeekChunk(score, addr)
-		if t==tt && err == nil {
+		if t == tt && err == nil {
 			return score, nil
 		}
 		if t != tt && err == nil {

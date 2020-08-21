@@ -12,7 +12,7 @@ func (_ newbucketer) NewBucket(numScoreCommonBits int, scoreCommonBytes []byte) 
 
 func TestBinHeap(t *testing.T) {
 	bh, err := NewBinHeap(newbucketer{})
-	if bh == nil || err != nil{
+	if bh == nil || err != nil {
 		t.Errorf("error calling NewBinHeap()")
 	}
 	s1 := ZeroScore
@@ -45,7 +45,7 @@ func TestBinHeap(t *testing.T) {
 	t.Logf("GetBucket(s1) = (%d,%d)", k, v)
 	k, v = bh.GetBucket(s2)
 	t.Logf("GetBucket(s2) = (%d,%d)", k, v)
-	for i:=0; ; i++ {
+	for i := 0; ; i++ {
 		v, err := bh.Get(i)
 		if err != nil {
 			break

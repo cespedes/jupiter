@@ -40,7 +40,7 @@ func (s Score) String() string {
 }
 
 func (s Score) Match(s2 Score, mask int) bool {
-	for i:=0; i<mask; i++ {
+	for i := 0; i < mask; i++ {
 		if !isBitEqual(s.s[:], s2.s[:], i) {
 			return false
 		}

@@ -1,11 +1,14 @@
 package jupiter
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
-	"encoding/binary"
 )
+
+var ErrorNotFound = errors.New("Not Found")
 
 type ReadWriteSeekCloser interface {
 	io.ReadWriteSeeker
@@ -20,10 +23,12 @@ type DataLog struct {
 // Global header: version
 
 // Each block is prefixed by a header that describes the contents of the
-// block.  The header contains the score, the type, the compression
-// algorithm, the compressed size and uncompressed size.
+// block.
 
-// To think: reference count, to be able to delete content
+// The header contains the score and the uncompressed size.
+
+// In the future, the header may also contain the type, a reference count,
+// the compression algorithm, the compressed size, and a checksum.
 
 func OpenDataLog(filename string) *DataLog {
 	panic("OpenDataLog() not implemented")
@@ -39,7 +44,7 @@ func NewDataLog() *DataLog {
 
 // WriteChunk stores a block of data, compressing it, and returns its address in the data log.
 func (d *DataLog) WriteChunk(score Score, t Type, b []byte) (addr uint64, err error) {
-	fmt.Printf("DEBUG: d.WriteChunk(score=%s, type=%d, b=%q)\n", score, t, b)
+	fmt.Printf("DEBUG: DataLog.WriteChunk(score=%s, type=%d, b=%q)\n", score, t, b)
 	position, err := d.fp.Seek(0, os.SEEK_END)
 	if err != nil {
 		return 0, err
@@ -49,7 +54,7 @@ func (d *DataLog) WriteChunk(score Score, t Type, b []byte) (addr uint64, err er
 	}
 	defer func() {
 		if err != nil {
-			if x, ok := d.fp.(interface {Truncate(size int64) (err error)}); ok {
+			if x, ok := d.fp.(interface{ Truncate(size int64) (err error) }); ok {
 				x.Truncate(position)
 			}
 		}
@@ -68,19 +73,52 @@ func (d *DataLog) WriteChunk(score Score, t Type, b []byte) (addr uint64, err er
 	if err != nil {
 		return 0, err
 	}
-	return 0, nil
+	return uint64(position), nil
 }
 
 // PeekChunk is used to check if a given block is stored at an address
 func (d *DataLog) PeekChunk(score Score, addr uint64) (t Type, err error) {
-	panic("DataLog.PeekChunk() not implemented")
-	return 0, nil
+	var s Score
+	_, err = d.fp.Seek(int64(addr), os.SEEK_SET)
+	if err != nil {
+		return 0, err
+	}
+	_, err = io.ReadFull(d.fp, s.s[:])
+	if err != nil {
+		return 0, err
+	}
+	if s.Equal(score) {
+		return 0, nil
+	}
+	return 0, ErrorNotFound
 }
 
 // GetChunk returns the block with a given score stored at an address
 func (d *DataLog) ReadChunk(score Score, addr uint64) (t Type, b []byte, err error) {
-	panic("DataLog.ReadChunk() not implemented")
-	return 0, nil, nil
+	fmt.Printf("DEBUG: DataLog.ReadChunk(score=%s, addr=%d)\n", score, addr)
+	_, err = d.fp.Seek(int64(addr), os.SEEK_SET)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	buf := make([]byte, ScoreSize+2)
+	_, err = io.ReadFull(d.fp, buf)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	var s Score
+	copy(s.s[:], buf)
+	if !s.Equal(score) {
+		return 0, nil, ErrorNotFound
+	}
+	size := binary.BigEndian.Uint16(buf[ScoreSize:])
+	buf = make([]byte, size)
+	_, err = io.ReadFull(d.fp, buf)
+	if err != nil {
+		return 0, nil, err
+	}
+	return 0, buf, nil
 }
 
 // func (j *Jupiter) Write(t Type, b []byte) (Score, error) {

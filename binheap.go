@@ -10,8 +10,8 @@ const (
 )
 
 type BinHeap struct {
-	filename    string
-	table       []uint32
+	filename string
+	table    []uint32
 }
 
 // OpenBinHeap opens a BinHeap stored in disk
@@ -57,14 +57,14 @@ func (bh *BinHeap) GetBucket(s Score) (int, uint32) {
 		panic("BinHeap.GetBucket(): len(bh.table)=nil (should not happen")
 	}
 	for b := 0; ; b++ {
-	        if bh.table[i] != BHNotLeaf {
+		if bh.table[i] != BHNotLeaf {
 			return i, bh.table[i]
-	        }
-	        if !isBitSet(s.s[:], b) {
+		}
+		if !isBitSet(s.s[:], b) {
 			i = i*2 + 1
-	        } else {
+		} else {
 			i = i*2 + 2
-	        }
+		}
 	}
 }
 

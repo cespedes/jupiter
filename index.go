@@ -12,9 +12,9 @@ type Index struct {
 	scoreBytesInEntry int
 	// A "firstBucket" could be used to support several indexes
 	// TODO firstBucket       uint32
-	numBuckets        uint32
-	maxBuckets        uint32 // 0 if there is no limit
-	buckets           map[uint32]*Bucket
+	numBuckets uint32
+	maxBuckets uint32 // 0 if there is no limit
+	buckets    map[uint32]*Bucket
 }
 
 // OpenIndex opens a file used as Index, and reads its contents into memory
