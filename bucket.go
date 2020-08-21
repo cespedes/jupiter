@@ -39,10 +39,10 @@ type Bucket [BlockSize]byte
 // * (addressBytes) bytes will be the address of the block in the data log
 
 const (
-	bktNumEntries         = 4
-	bktNumAddressBytes    = 6
-	bktNumScoreBytes      = 7
-	bktNumScoreCommonBits = 8
+	bktNumEntries         = 4 // Number of entries stored in bucket
+	bktNumAddressBytes    = 6 // Number of bytes for addressing in each entry
+	bktNumScoreBytes      = 7 // Total number of bytes used to address each entry
+	bktNumScoreCommonBits = 8 // Number of bits for the score common to all the entries
 	bktScoreCommonOffset  = 9
 )
 
@@ -134,7 +134,7 @@ func (b *Bucket) GetEntry(i int) *Entry {
 
 	entryBytes := scoreBytes - commonBits/8
 	offset := b.entryOffset() + i*b.entrySize()
-	copy(e.score.s[scoreBytes-entryBytes:scoreBytes+1], b[offset:])
+	copy(e.score.s[scoreBytes-entryBytes:scoreBytes], b[offset:])
 
 	e.mask = scoreBytes * 8
 
@@ -171,9 +171,10 @@ func numBytesInUint64(a uint64) int {
 // Add adds an entry to a bucket, identified by a score, and points it to a given address.
 // It returns true if successful, false if there is no space in the bucket.
 func (b *Bucket) Add(s Score, a uint64) bool {
+	fmt.Printf("DEBUG: Bucket.Add(%s, %d)\n", s, a)
 	commonScore, mask := b.CommonScore()
 	if !s.Match(commonScore, mask) {
-		panic(fmt.Sprintf("Bucket.Add: score %s outside of %s/%d", s, commonScore, mask))
+		panic(fmt.Sprintf("Bucket.Add(): score %s outside of %s/%d", s, commonScore, mask))
 	}
 
 	// Does "a" fit in "numAddressBytes"?
@@ -191,19 +192,24 @@ func (b *Bucket) Add(s Score, a uint64) bool {
 			return false
 		}
 		// TODO: increment "numAddressBytes"
-		panic("not implemented")
+		panic("Bucket.Add(): incrementing numAddressBytes: not implemented")
 	}
-	// TODO:
-	//	if there is not enough space to add the new score {
-	//		return false
-	//	}
-	//	add new score
-	panic("not implemented")
+	entrySize := b.numAddressBytes() + b.numScoreBytes() - b.numScoreCommonBits()/8
+	maxEntries := (BlockSize - b.entryOffset()) / entrySize
+	if maxEntries <= b.NumEntries() {
+		// not enough space to add the new score
+		return false
+	}
+	offset := b.entryOffset() + b.NumEntries()*entrySize
+	// TODO: add score to entry
+	// TODO: add addr to entry
+	// TODO: increment NumEntries
+	panic("Bucket.Add(): adding new score: not implemented")
 	return false
 }
 
 // Split divides the entries in a bucket into two, in order to add a new bucket to an index.
 func (b *Bucket) Split(b2 *Bucket) error {
-	panic("not implemented")
+	panic("Bucket.Split(): not implemented")
 	return nil
 }

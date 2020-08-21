@@ -24,9 +24,13 @@ func Open(c *Config) *Jupiter {
 func New() (*Jupiter, error) {
 	var j Jupiter
 	var err error
-	index := NewIndex(ScoreBytesInEntry)
-	j.index = index
-	j.binheap, err = NewBinHeap(j.index)
+	j.index = NewIndex(ScoreBytesInEntry)
+
+	firstBucket, err := j.index.NewBucket(0, []byte{})
+	if err != nil {
+		return nil, err
+	}
+	j.binheap, err = NewBinHeap(firstBucket)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +43,7 @@ func (j *Jupiter) Read(score Score) (Type, []byte, error) {
 	bucket := j.index.Bucket(buckn)
 	addrs := bucket.GetAddress(score)
 	for _, addr := range addrs {
-		t, b, err := j.datalog.GetChunk(score, addr)
+		t, b, err := j.datalog.ReadChunk(score, addr)
 		if err == nil {
 			return t, b, nil
 		}
@@ -58,10 +62,10 @@ func (j *Jupiter) Write(t Type, b []byte) (Score, error) {
 			return score, nil
 		}
 		if t != tt && err == nil {
-			return ZeroScore, fmt.Errorf("Jupiter.Write: block already written with different type")
+			return ZeroScore, fmt.Errorf("Jupiter.Write(): block already written with different type")
 		}
 	}
-	addr, err := j.datalog.NewChunk(score, t, b)
+	addr, err := j.datalog.WriteChunk(score, t, b)
 	if err != nil {
 		return ZeroScore, err
 	}
@@ -72,6 +76,6 @@ func (j *Jupiter) Write(t Type, b []byte) (Score, error) {
 	// j.index.NewBucket(numScoreCommonBits int, scoreCommonBytes []byte) (uint32, error) {
 	// bucket.Split(b2 *Bucket) error {
 	// j.binheap.NewLeaf(k int, v uint32) error {
-	panic("not implemented")
+	panic("Jupiter.Write(): creating new bucket: not implemented")
 	return ZeroScore, nil
 }

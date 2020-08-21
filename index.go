@@ -19,7 +19,7 @@ type Index struct {
 
 // OpenIndex opens a file used as Index, and reads its contents into memory
 func OpenIndex(filename string) *Index {
-	panic("not implemented")
+	panic("OpenIndex() not implemented")
 	return &Index{filename: filename}
 }
 
@@ -28,7 +28,7 @@ func OpenIndex(filename string) *Index {
 //	return &Index{scoreBytesInEntry: scoreBytesInEntry, firstBucket: firstBucket}
 //}
 func NewIndex(scoreBytesInEntry int) *Index {
-	return &Index{scoreBytesInEntry: scoreBytesInEntry}
+	return &Index{scoreBytesInEntry: scoreBytesInEntry, buckets: make(map[uint32]*Bucket)}
 }
 
 // NumBuckets returns the number of buckets in an Index
@@ -47,19 +47,19 @@ func (in *Index) Bucket(n uint32) *Bucket {
 	if b != nil {
 		return b
 	}
-	panic("not implemented")
+	panic("Index.Bucket(): read from file: not implemented")
 	return nil
 }
 
 // Sync writes the dirty buckets into disk
 func (in *Index) Sync() error {
-	panic("not implemented")
+	panic("Index.Sync(): not implemented")
 	return nil
 }
 
 // Write writes the whole index into disk
 func (in *Index) Write(f io.Writer, numBlocks uint64) error {
-	panic("not implemented")
+	panic("Index.Write(): not implemented")
 	return nil
 }
 
